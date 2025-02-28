@@ -99,6 +99,42 @@ This is a Taskify API built with Next.js and MySQL. It provides endpoints to man
 
 6. The API will be available at `http://localhost:3000`
 
+## Docker Deployment
+
+### Local Docker Development
+
+1. Build and run the Docker container locally:
+
+   ```bash
+   docker-compose up --build
+   ```
+
+2. The API will be available at `http://localhost:3000`
+
+### Deploying to EC2
+
+1. Update the `deploy-to-ec2.sh` script with your EC2 details:
+
+   - Replace `your-ec2-public-ip` with your EC2 instance's public IP
+   - Replace `~/path/to/your-key.pem` with the path to your EC2 key file
+   - Replace `https://github.com/yourusername/taskify-backend.git` with your repository URL
+
+2. Make the script executable and run it:
+
+   ```bash
+   chmod +x deploy-to-ec2.sh
+   ./deploy-to-ec2.sh
+   ```
+
+3. The script will:
+   - Install Docker and Docker Compose on your EC2 instance if needed
+   - Clone your repository to the EC2 instance
+   - Set up environment variables with your RDS database details
+   - Build and run the Docker container
+   - Configure Nginx as a reverse proxy
+
+4. Your application will be accessible at `http://<ec2-public-ip>`
+
 ## Troubleshooting MySQL Connection Issues
 
 If you encounter the error `ECONNREFUSED` when running the migration script, it typically means:

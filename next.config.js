@@ -8,7 +8,9 @@ const nextConfig = {
   // Disable static optimization for API routes
   experimental: {
     serverComponentsExternalPackages: ['sqlite3', 'bcryptjs']
-  }
+  },
+  // Add output: 'standalone' for Docker deployment
+  output: 'standalone',
 };
 
 module.exports = nextConfig;
