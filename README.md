@@ -63,7 +63,7 @@ This is a Taskify API built with Next.js and MySQL. It provides endpoints to man
 
    ```bash
    git clone <repository-url>
-   cd trello-clone-backend
+   cd taskify-backend
    ```
 
 2. Install dependencies:
@@ -74,7 +74,7 @@ This is a Taskify API built with Next.js and MySQL. It provides endpoints to man
 
 3. Configure environment variables:
 
-   Create a `.env` file in the root directory with the following content:
+   Create a `.env` file in the root directory with the following content (or copy from `.env.example`):
 
    ```
    JWT_SECRET=your_jwt_secret
@@ -83,6 +83,8 @@ This is a Taskify API built with Next.js and MySQL. It provides endpoints to man
    DB_PASSWORD=your_password
    DB_NAME=trello_clone
    DB_PORT=3306
+   EC2_HOST=your-ec2-public-ip  # only needed for deployment
+   REPO_URL=your-repo-url  # only needed for deployment
    ```
 
 4. Run the database migration script:
@@ -103,13 +105,15 @@ This is a Taskify API built with Next.js and MySQL. It provides endpoints to man
 
 ### Local Docker Development
 
-1. Build and run the Docker container locally:
+1. Create a `.env` file with your environment variables (copy from `.env.example`).
+
+2. Build and run the Docker container locally:
 
    ```bash
    docker-compose up --build
    ```
 
-2. The API will be available at `http://localhost:3000`
+3. The API will be available at `http://localhost:3000`
 
 ### Deploying to EC2
 

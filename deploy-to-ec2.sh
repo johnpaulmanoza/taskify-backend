@@ -60,6 +60,8 @@ DB_USER=RDS_USERNAME_PLACEHOLDER
 DB_PASSWORD=RDS_PASSWORD_PLACEHOLDER
 DB_NAME=RDS_DBNAME_PLACEHOLDER
 DB_PORT=3306
+EC2_HOST=EC2_HOST_PLACEHOLDER
+REPO_URL=REPO_URL_PLACEHOLDER
 ENV
 
 # Build and start the Docker containers
@@ -136,6 +138,8 @@ sed -i "s|RDS_USERNAME_PLACEHOLDER|$RDS_USERNAME|g" deploy-script.sh
 sed -i "s|RDS_PASSWORD_PLACEHOLDER|$RDS_PASSWORD|g" deploy-script.sh
 sed -i "s|RDS_DBNAME_PLACEHOLDER|$RDS_DBNAME|g" deploy-script.sh
 sed -i "s|RDS_JWT_SECRET_PLACEHOLDER|$JWT_SECRET|g" deploy-script.sh
+sed -i "s|EC2_HOST_PLACEHOLDER|$EC2_HOST|g" deploy-script.sh
+sed -i "s|REPO_URL_PLACEHOLDER|$REPO_URL|g" deploy-script.sh
 
 # Make the script executable
 chmod +x deploy-script.sh
