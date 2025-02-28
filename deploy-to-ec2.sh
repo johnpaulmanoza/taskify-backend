@@ -1,12 +1,40 @@
 #!/bin/bash
-
 # This script deploys the Taskify backend to an EC2 instance using Docker
+
+# Check if required environment variables are set
+# Load environment variables from .env file and export them
+if [[ -f .env ]]; then
+  export $(grep -v '^#' .env | xargs)
+else
+  echo "Error: .env file not found!"
+  exit 1
+fi
+
+# Function to check if a variable is empty
+check_env_var() {
+  local var_name="$1"
+  local var_value="${!var_name}"
+  
+  if [[ -z "$var_value" ]]; then
+    echo "Error: $var_name is not set or empty -- {$var_value}"
+    exit 1
+  fi
+}
+
+# Check required environment variables
+check_env_var "EC2_HOST"
+check_env_var "REPO_URL"
+check_env_var "JWT_SECRET"
+check_env_var "DB_HOST"
+check_env_var "DB_USER"
+check_env_var "DB_PASSWORD"
+check_env_var "DB_NAME"
+
+echo "All required environment variables are set."
 
 # Set variables
 EC2_USER="ec2-user"
-EC2_HOST="your-ec2-public-ip" # Replace with your EC2 public IP
-KEY_PATH="~/path/to/your-key.pem" # Replace with path to your key file
-REPO_URL="https://github.com/yourusername/taskify-backend.git" # Replace with your repo URL
+KEY_PATH="./taskify-key.pem" # Path to your SSH key (relative to current directory)
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -16,8 +44,26 @@ NC='\033[0m' # No Color
 
 echo -e "${YELLOW}Deploying Taskify Backend to EC2...${NC}"
 
+# Debug information
+echo -e "${YELLOW}Checking for SSH key file...${NC}"
+if [ -f "$KEY_PATH" ]; then
+    echo -e "${GREEN}Found SSH key at: $KEY_PATH${NC}"
+    ls -la "$KEY_PATH"
+else
+    echo -e "${RED}SSH key not found at: $KEY_PATH${NC}"
+    echo -e "${YELLOW}Current directory: $(pwd)${NC}"
+    echo -e "${YELLOW}Files in current directory:${NC}"
+    ls -la
+    exit 1
+fi
+
+# Set proper permissions for the key file
+echo -e "${YELLOW}Setting permissions for key file: $KEY_PATH${NC}"
+chmod 400 "$KEY_PATH"
+
 # Create deployment script to run on the EC2 instance
-cat > deploy-script.sh << 'EOL'
+echo -e "${YELLOW}Creating deployment script...${NC}"
+cat > /tmp/deploy-script.sh << 'EOF'
 #!/bin/bash
 
 # Install Docker if not already installed
@@ -99,61 +145,46 @@ EON
 fi
 
 echo "Deployment completed successfully!"
-EOL
+EOF
 
 # Replace placeholders in the script
-sed -i "s|REPO_URL_PLACEHOLDER|$REPO_URL|g" deploy-script.sh
+echo -e "${YELLOW}Configuring deployment script...${NC}"
 
-# Get RDS details from Terraform output
-echo -e "${YELLOW}Retrieving RDS details from Terraform...${NC}"
-cd terraform
-
-# Get RDS endpoint
-RDS_ENDPOINT=$(terraform output -raw rds_endpoint 2>/dev/null)
-if [ -z "$RDS_ENDPOINT" ]; then
-    echo -e "${RED}Failed to get RDS endpoint from Terraform. Make sure you've applied your Terraform configuration.${NC}"
-    exit 1
-fi
-
-# Get other RDS details from terraform.tfvars
-RDS_USERNAME=$(grep db_username terraform.tfvars | cut -d '=' -f2 | tr -d ' "')
-RDS_PASSWORD=$(grep db_password terraform.tfvars | cut -d '=' -f2 | tr -d ' "')
-RDS_DBNAME=$(grep db_name terraform.tfvars | cut -d '=' -f2 | tr -d ' "')
-JWT_SECRET=$(grep jwt_secret terraform.tfvars | cut -d '=' -f2 | tr -d ' "')
-
-# Get EC2 public IP if not provided
-if [ "$EC2_HOST" = "your-ec2-public-ip" ]; then
-    EC2_HOST=$(terraform output -raw ec2_public_ip 2>/dev/null)
-    if [ -z "$EC2_HOST" ]; then
-        echo -e "${RED}Failed to get EC2 public IP from Terraform. Please provide it manually.${NC}"
-        exit 1
-    fi
-fi
-
-cd ..
-
-# Replace RDS details in the script
-sed -i "s|RDS_ENDPOINT_PLACEHOLDER|$RDS_ENDPOINT|g" deploy-script.sh
-sed -i "s|RDS_USERNAME_PLACEHOLDER|$RDS_USERNAME|g" deploy-script.sh
-sed -i "s|RDS_PASSWORD_PLACEHOLDER|$RDS_PASSWORD|g" deploy-script.sh
-sed -i "s|RDS_DBNAME_PLACEHOLDER|$RDS_DBNAME|g" deploy-script.sh
-sed -i "s|RDS_JWT_SECRET_PLACEHOLDER|$JWT_SECRET|g" deploy-script.sh
-sed -i "s|EC2_HOST_PLACEHOLDER|$EC2_HOST|g" deploy-script.sh
-sed -i "s|REPO_URL_PLACEHOLDER|$REPO_URL|g" deploy-script.sh
+# Replace placeholders using perl (works on both Linux and macOS)
+perl -i -pe "s|REPO_URL_PLACEHOLDER|$REPO_URL|g" /tmp/deploy-script.sh
+perl -i -pe "s|RDS_ENDPOINT_PLACEHOLDER|$DB_HOST|g" /tmp/deploy-script.sh
+perl -i -pe "s|RDS_USERNAME_PLACEHOLDER|$DB_USER|g" /tmp/deploy-script.sh
+perl -i -pe "s|RDS_PASSWORD_PLACEHOLDER|$DB_PASSWORD|g" /tmp/deploy-script.sh
+perl -i -pe "s|RDS_DBNAME_PLACEHOLDER|$DB_NAME|g" /tmp/deploy-script.sh
+perl -i -pe "s|RDS_JWT_SECRET_PLACEHOLDER|$JWT_SECRET|g" /tmp/deploy-script.sh
+perl -i -pe "s|EC2_HOST_PLACEHOLDER|$EC2_HOST|g" /tmp/deploy-script.sh
+perl -i -pe "s|REPO_URL_PLACEHOLDER|$REPO_URL|g" /tmp/deploy-script.sh
 
 # Make the script executable
-chmod +x deploy-script.sh
+chmod +x /tmp/deploy-script.sh
 
 # Copy the script to the EC2 instance
 echo -e "${YELLOW}Copying deployment script to EC2 instance...${NC}"
-scp -i "$KEY_PATH" -o StrictHostKeyChecking=no deploy-script.sh $EC2_USER@$EC2_HOST:~/deploy-script.sh
+scp -i "$KEY_PATH" -o StrictHostKeyChecking=no /tmp/deploy-script.sh $EC2_USER@$EC2_HOST:~/deploy-script.sh
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to copy deployment script to EC2 instance.${NC}"
+    echo -e "${YELLOW}Checking SSH connection...${NC}"
+    ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no -o ConnectTimeout=10 $EC2_USER@$EC2_HOST "echo 'SSH connection successful'"
+    exit 1
+fi
 
 # Execute the script on the EC2 instance
 echo -e "${YELLOW}Executing deployment script on EC2 instance...${NC}"
 ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "chmod +x ~/deploy-script.sh && ~/deploy-script.sh"
 
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to execute deployment script on EC2 instance.${NC}"
+    exit 1
+fi
+
 # Clean up local script
-rm deploy-script.sh
+rm /tmp/deploy-script.sh
 
 echo -e "${GREEN}Deployment process completed!${NC}"
 echo -e "${YELLOW}Note: If Docker was just installed, you may need to reconnect to the instance and run the script again.${NC}"
